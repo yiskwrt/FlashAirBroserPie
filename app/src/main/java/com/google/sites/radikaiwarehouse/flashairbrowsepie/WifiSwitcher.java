@@ -52,7 +52,7 @@ public class WifiSwitcher {
 
         //Force bind sockets to wifi
         callback.onMessage("bindToWifiNetwork");
-        if(!bindToWifiNetwork(4)) {
+        if(!bindToWifiNetwork(8)) {
             return CONNECT_ERROR_BIND_WIFI;
         }
 
