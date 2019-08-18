@@ -1,17 +1,13 @@
 package com.google.sites.radikaiwarehouse.flashairbrowsepie;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.net.ConnectivityManager;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
-import android.os.AsyncTask;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -20,19 +16,11 @@ import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -137,7 +125,18 @@ public class MainActivity extends AppCompatActivity {
         btn_download.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                TaskMakeFileList task = new TaskMakeFileList(m_SSID, "http://flashair");
+                TaskMakeFileList task = new TaskMakeFileList(m_wifiswitcher, m_SSID, "http://flashair", new TaskMakeFileList.Callback() {
+                    @Override
+                    public void onProgressUpdate(String msg) {
+                        //Just print progress message
+                        MainActivity.this.lbl_message.setText(msg);
+                    }
+
+                    @Override
+                    public void onComplete(List<String> filelist) {
+                        MainActivity.this.formatFileList(filelist);
+                    }
+                });
                 task.execute("/DCIM");
             }
         });
@@ -163,6 +162,41 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void formatFileList(List<String> filelist) {
+        //format and print clickable text
+        if(filelist!=null && filelist.size()>0) {
+            SpannableStringBuilder sb = new SpannableStringBuilder();
+            for(int i=0; (i<filelist.size()||i<20); i++) {
+                sb.append(
+                        filelist.get(i),
+                        new MainActivity.MyClickableSpan(filelist.get(i)) {
+                            @Override
+                            void onClick(View view, String msg) {
+                                MainActivity.this.lbl_message.setText("start downloading");
+                                TaskDownloadPicture task =new TaskDownloadPicture(m_wifiswitcher, m_SSID, "http://flashair", new TaskDownloadPicture.Callback(){
+
+                                    @Override
+                                    public void onProgressUpdate(String msg) {
+                                        MainActivity.this.lbl_message.setText(msg);
+                                    }
+
+                                    @Override
+                                    public void onComplete(Bitmap bm) {
+                                        MainActivity.this.picview_download.setImageBitmap(bm);
+                                    }
+                                });
+                                task.execute(msg);
+                            }
+                        },
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                sb.append('\n');
+            }
+            MainActivity.this.lbl_message.setText(sb);
+        } else {
+            MainActivity.this.lbl_message.setText("no items are detected by crawler");
+        }
+    }
+
     /*Utility class to attach an action to link text*/
     public abstract class MyClickableSpan extends ClickableSpan {
         private String m_msg;
@@ -176,160 +210,5 @@ public class MainActivity extends AppCompatActivity {
         }
 
         abstract void onClick(View view, String msg);
-    }
-
-    /*Utility class to attach an action to link text*/
-    public class TaskMakeFileList extends AsyncTask<String, String, List<String>> {
-        private String m_ssid;
-        private String m_baseurl;
-
-        public TaskMakeFileList(String ssid, String baseurl) {
-            super();
-            m_ssid = ssid;
-            m_baseurl = baseurl;
-        }
-
-        @Override
-        protected List<String> doInBackground(String... dirnames) {
-            ArrayList<String> filelist = new ArrayList<String>();
-
-            //Switch WiFi to FlashAir network
-            MainActivity.this.m_wifiswitcher.connectToCardSSID(m_ssid, new WifiSwitcher.MessageCallback() {
-                @Override
-                public void onMessage(String msg) {
-                    publishProgress(msg);
-                }
-            });
-
-            //List of Directories
-            ArrayList<String> dirlist = new ArrayList<String>();
-            for(String dirname : dirnames) {
-                dirlist.add(dirname);
-            }
-            while(!dirlist.isEmpty()) {
-                String dirname = dirlist.remove(0);
-                Log.d("TaskMakeFileList", "scanning " + dirname);
-                try{
-                    String urlstr = m_baseurl + "/command.cgi?op=100&DIR=" + dirname;
-                    URL url = new URL(urlstr);
-                    HttpURLConnection urlConn = (HttpURLConnection) url.openConnection();
-                    BufferedReader br = new BufferedReader(new InputStreamReader(urlConn.getInputStream()));
-                    String content;
-                    while((content=br.readLine())!=null) {
-                        Log.d("TaskMakeFileList", content);
-                        FlashAirFileEntry entry = FlashAirFileEntry.fromString(content);
-                        if(entry!=null) {
-                            if(entry.isDir()) {
-                                dirlist.add(entry.getFullPathName());
-                            } else {
-                                filelist.add(entry.getFullPathName());
-                            }
-                        }
-                    }
-                    br.close();
-                    urlConn.disconnect();
-                } catch(Exception e) {
-                    Log.d("TaskMakeFileList", e.toString());
-                    break;
-                }
-            }
-
-            //switch back to original WiFi SSID
-            MainActivity.this.m_wifiswitcher.recoverToOrgSSID(null);
-
-            //Done
-            return filelist;
-        }
-
-        @Override
-        protected void onProgressUpdate(String... messages) {
-            super.onProgressUpdate(messages);
-            MainActivity.this.lbl_message.setText(messages[0]);
-        }
-
-        @Override
-        protected void onPostExecute(List<String> filelist) {
-            if(filelist.size()>0) {
-                SpannableStringBuilder sb = new SpannableStringBuilder();
-                for(int i=0; (i<filelist.size()||i<20); i++) {
-                    sb.append(
-                        filelist.get(i),
-                        new MyClickableSpan(filelist.get(i)) {
-                            @Override
-                            void onClick(View view, String msg) {
-                                MainActivity.this.lbl_message.setText("start downloading");
-                                new TaskDownloadPicture(m_SSID, "http://flashair").execute(msg);
-                            }
-                        },
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    sb.append('\n');
-                }
-                MainActivity.this.lbl_message.setText(sb);
-            } else {
-                MainActivity.this.lbl_message.setText("no items are detected by crawler");
-            }
-        }
-    }
-
-    public class TaskDownloadPicture extends AsyncTask<String, String, Bitmap> {
-        private String m_ssid;
-        private String m_baseurl;
-
-        public TaskDownloadPicture(String ssid, String baseurl) {
-            super();
-            m_ssid = ssid;
-            m_baseurl = baseurl;
-        }
-
-        @Override
-        protected Bitmap doInBackground(String... picpathnames) {
-            //Switch WiFi to FlashAir network
-            int status = MainActivity.this.m_wifiswitcher.connectToCardSSID(m_ssid, new WifiSwitcher.MessageCallback() {
-                @Override
-                public void onMessage(String msg) {
-                    publishProgress(msg);
-                }
-            });
-            if(status!=WifiSwitcher.CONNECT_OK) {
-                return null;
-            }
-
-            //Download Picture
-            publishProgress("downloading picture...");
-            Bitmap result = null;
-            try {
-                String urlstr = m_baseurl + "/" + picpathnames[0];
-                URL url = new URL(urlstr);
-                HttpURLConnection urlConn = (HttpURLConnection) url.openConnection();
-                InputStream in = new BufferedInputStream(urlConn.getInputStream());
-                result = BitmapFactory.decodeStream(in);
-                urlConn.disconnect();
-            } catch (Exception e) {
-                Log.d("MainActivity", "error at HttpsURLConnection: " + e.toString());
-            }
-
-            //switch back to original WiFi SSID
-            publishProgress("connecting original WiFi SSID");
-            MainActivity.this.m_wifiswitcher.recoverToOrgSSID(null);
-
-            //Done
-            if(result!=null) {
-                publishProgress("complete downloading: " + picpathnames[0]);
-            } else {
-                publishProgress("failed to download: " + picpathnames[0]);
-            }
-            return result;
-        }
-
-        @Override
-        protected void onProgressUpdate(String... values) {
-            super.onProgressUpdate(values);
-            MainActivity.this.lbl_message.setText(values[0]);
-        }
-
-        @Override
-        protected void onPostExecute(Bitmap bm) {
-            picview_download.setImageBitmap(bm);
-        }
     }
 }
