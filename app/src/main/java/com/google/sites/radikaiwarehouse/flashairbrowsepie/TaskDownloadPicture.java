@@ -75,6 +75,9 @@ public class TaskDownloadPicture extends AsyncTask<String, String, Bitmap> {
         m_callback.onComplete(bm);
     }
 
+    @Override
+    protected void onCancelled() {m_callback.onComplete(null);}
+
     public interface Callback {
         public abstract void onProgressUpdate(String msg);
         public abstract void onComplete(Bitmap bm);

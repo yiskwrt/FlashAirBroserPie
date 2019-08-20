@@ -90,6 +90,9 @@ public class TaskMakeFileList extends AsyncTask<String, String, List<String>> {
         m_callback.onComplete(filelist);
     }
 
+    @Override
+    protected void onCancelled() {m_callback.onComplete(null);}
+
     public interface Callback {
         public abstract void onProgressUpdate(String msg);
         public abstract void onComplete(List<String> filelist);

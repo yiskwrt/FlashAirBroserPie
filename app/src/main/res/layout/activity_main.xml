@@ -11,13 +11,7 @@
         android:id="@+id/btn_scanwifi"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Select FlashAir Card" />
-
-    <Button
-        android:id="@+id/btn_download"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Download" />
+        android:text="Update Wifi List" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -33,7 +27,8 @@
                 android:id="@+id/lbl_message"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="message output" />
+                android:text="message output"
+                android:textSize="22sp" />
         </LinearLayout>
     </ScrollView>
 
