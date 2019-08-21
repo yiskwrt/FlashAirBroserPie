@@ -1,0 +1,5 @@
+[kisscc0-apple-pie.svg]
+* released under CC0 license
+* source: https://www.kisscc0.com/clipart/apple-pie-tart-apple-crisp-cherry-pie-apple-dumpli-fg9vpo/
+* modified from original; syntax for viewport attribute
+
